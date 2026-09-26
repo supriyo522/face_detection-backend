@@ -4,35 +4,7 @@ const Attendance = require('../models/Attendance');
 const Employee = require('../models/Employee');
 
 function todayStr() {
-  const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  const parts = formatter.formatToParts(now);
-  const values = {};
-  parts.forEach((part) => {
-    if (part.type !== 'literal') values[part.type] = part.value;
-  });
-
-  return `${values.year}-${values.month}-${values.day}`; // YYYY-MM-DD in IST
-}
-
-function toISTString(date) {
-  if (!date) return null;
-  return new Date(date).toLocaleString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 // Called by the client once it has matched a live face to an employeeId
@@ -60,14 +32,7 @@ router.post('/mark', async (req, res) => {
       await record.save();
     }
 
-    res.json({
-      message: `Attendance marked for ${employee.name}`,
-      record: {
-        ...record.toObject(),
-        checkInTime: toISTString(record.checkInTime),
-        checkOutTime: toISTString(record.checkOutTime),
-      },
-    });
+    res.json({ message: `Attendance marked for ${employee.name}`, record });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -89,8 +54,8 @@ router.get('/today', async (req, res) => {
         name: emp.name,
         department: emp.department,
         status: presentIds.has(emp._id.toString()) ? 'Present' : 'Absent',
-        checkInTime: record ? toISTString(record.checkInTime) : null,
-        checkOutTime: record ? toISTString(record.checkOutTime) : null,
+        checkInTime: record ? record.checkInTime : null,
+        checkOutTime: record ? record.checkOutTime : null,
       };
     });
 
@@ -106,13 +71,7 @@ router.get('/history/:employeeId', async (req, res) => {
     const employee = await Employee.findOne({ employeeId: req.params.employeeId });
     if (!employee) return res.status(404).json({ error: 'Employee not found' });
     const records = await Attendance.find({ employee: employee._id }).sort({ date: -1 });
-    res.json(
-      records.map((record) => ({
-        ...record.toObject(),
-        checkInTime: toISTString(record.checkInTime),
-        checkOutTime: toISTString(record.checkOutTime),
-      }))
-    );
+    res.json(records);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
